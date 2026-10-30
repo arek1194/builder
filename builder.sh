@@ -153,6 +153,23 @@ copy_extra_packages
 echo_c 33 "\nCopying device files"
 cp -afv ${BUILDER_DIR}/${ITEM}/* ${FIRMWARE_DIR}
 
+# Preserve the standard OpenIPC overlay and add the Foscam overlay.
+if [ "${DEVICE}" = "ssc338q_ultimate_foscam-t8ep" ]; then
+    FRAGMENT="${FIRMWARE_DIR}/general/openipc.fragment"
+    python3 - "$FRAGMENT" <<'PYFRAGMENT'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+s = p.read_text()
+old = 'BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL)/overlay"'
+new = 'BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL)/overlay $(BR2_EXTERNAL)/../br-ext-chip-sigmastar/board/ssc338q_ultimate_foscam-t8ep/overlay"'
+if old not in s:
+    raise SystemExit("ERROR: unexpected OpenIPC overlay configuration")
+p.write_text(s.replace(old, new, 1))
+PYFRAGMENT
+fi
+
 echo_c 33 "\nBuilding the device"
 # Propagate make's status. Without this the script ALWAYS exits 0: the result is
 # discarded, copy_to_archive then runs over an empty output/images and still
