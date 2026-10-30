@@ -1,0 +1,29 @@
+#!/bin/sh
+# Foscam T8EP / OpenIPC: small, bounded command dispatcher.
+# No eval, no remote shell, no unauthenticated HTTP listener.
+set -u
+CMD="${1:-}"
+LOG=/tmp/foscam-control.log
+case "$CMD" in
+  ping) echo pong ;;
+  status) uname -a; uptime; df -h /overlay 2>/dev/null ;;
+  uptime) uptime ;;
+  version) cat /etc/os-release 2>/dev/null | head -n 8 ;;
+  memory) free ;;
+  storage) df -h ;;
+  network) ip addr show 2>/dev/null | head -n 35 ;;
+  majestic_status) pidof majestic >/dev/null && echo running || echo stopped ;;
+  mqtt_status) pidof mqtt-bot >/dev/null && echo running || echo stopped ;;
+  snapshot)
+    # Existing Majestic snapshot endpoint; save only to RAM, not NOR flash.
+    if command -v wget >/dev/null 2>&1; then
+      wget -q -T 5 -O /tmp/foscam-snapshot.jpg http://127.0.0.1/image.jpg && echo /tmp/foscam-snapshot.jpg || echo snapshot_failed
+    else echo wget_unavailable; fi ;;
+  audio_test)
+    # Play a preloaded raw PCM file only if one exists.
+    FILE=/usr/share/foscam/audio/test.pcm
+    if [ -s "$FILE" ] && command -v curl >/dev/null 2>&1; then
+      curl -fsS --max-time 20 -X POST --data-binary @"$FILE" http://127.0.0.1/play_audio >/dev/null && echo played || echo audio_failed
+    else echo audio_file_or_curl_missing; fi ;;
+  *) echo unsupported_command; exit 2 ;;
+esac
