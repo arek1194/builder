@@ -1,0 +1,42 @@
+#!/bin/sh
+
+CONFIG=/etc/mqtt-bot.conf
+PIDFILE=/var/run/mqtt-bot.pid
+
+start() {
+    [ -f "$CONFIG" ] || return 0
+    command -v mqtt-bot >/dev/null 2>&1 || return 1
+
+    . "$CONFIG"
+
+    [ -n "$MQTT_HOST" ] || return 0
+    [ -n "$MQTT_USER" ] || return 0
+    [ -n "$MQTT_PASSWORD" ] || return 0
+
+    mqtt-bot \
+        -h "$MQTT_HOST" \
+        -p "${MQTT_PORT:-1883}" \
+        -u "$MQTT_USER" \
+        -P "$MQTT_PASSWORD" \
+        -t "foscam/t8ep/cmd" \
+        -r "foscam/t8ep/response" \
+        -q 1 \
+        -w ping:/bin/echo:pong \
+        -w status:/bin/uname:-a \
+        >/dev/null 2>&1 &
+
+    echo $! > "$PIDFILE"
+}
+
+stop() {
+    if [ -f "$PIDFILE" ]; then
+        kill "$(cat "$PIDFILE")" 2>/dev/null
+        rm -f "$PIDFILE"
+    fi
+}
+
+case "$1" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+esac
